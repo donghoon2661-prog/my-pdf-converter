@@ -8,7 +8,7 @@ from datetime import datetime
 
 # 1. 웹사이트 타이틀 및 레이아웃 설정
 st.set_page_config(page_title="PDF to Excel Converter", page_icon="📄", layout="wide")
-st.title("📄 COA 성적서 PDF ➡️ 엑셀 변환기 (전체 페이지)")
+st.title("📄 COA 성적서 PDF ➡️ Raw data 추출기 (전체 페이지)")
 st.write("PDF 파일을 업로드하면 내부의 모든 표(Table)를 감지하여 하나의 통합 엑셀 파일로 변환해 드립니다.")
 
 st.markdown("---")
