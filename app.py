@@ -19,35 +19,86 @@ if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
 # ==========================================
-# [사이드바 기능] 최근 생성된 파일 5개 목록 관리
+# [사이드바 기능] 최근 파일 목록 (수정 / 삭제 대시보드)
 # ==========================================
-st.sidebar.title("📁 최근 변환된 파일 (최대 5개)")
-st.sidebar.write("최근에 생성된 파일들은 창을 닫았다가 다시 켜도 아래에서 바로 재다운로드할 수 있습니다.")
+st.sidebar.title("📁 최근 변환된 파일 관리 (최대 5개)")
+st.sidebar.write("최근 파일의 이름을 수정하거나 서버에서 영구 삭제할 수 있습니다.")
 
+# 폴더 내 xlsx 파일 목록 가져오기 (최신순 정렬)
 existing_files = glob.glob(os.path.join(TEMP_DIR, "*.xlsx"))
 existing_files.sort(key=os.path.getmtime, reverse=True)
 
+# 5개 유지보수 용량 관리
 if len(existing_files) > 5:
     for old_file in existing_files[5:]:
-        try:
-            os.remove(old_file)
-        except:
-            pass
+        try: os.remove(old_file)
+        except: pass
     existing_files = existing_files[:5]
 
+# 사이드바 리스트 표출 및 개별 제어판 구축
 if existing_files:
-    for file_path in existing_files:
+    for idx, file_path in enumerate(existing_files):
         file_name = os.path.basename(file_path)
-        display_name = file_name.split("_", 1)[-1] if "_" in file_name else file_name
         
+        # 파일명에서 날짜 표기(타임스탬프)와 본래 파일명 분리
+        # 예: 20231024_보고서.xlsx -> 타임스탬프: 20231024_, 이름: 보고서.xlsx
+        if "_" in file_name:
+            timestamp_prefix, pure_name = file_name.split("_", 1)
+        else:
+            timestamp_prefix, pure_name = "", file_name
+            
+        # UI 구분을 위한 실선
+        st.sidebar.markdown(f"**📄 파일 {idx+1}**")
+        
+        # 1. 이름 수정 입력창 (확장자 제외하고 보여줌)
+        pure_name_no_ext = pure_name.replace(".xlsx", "")
+        new_name_input = st.sidebar.text_input(
+            "✏️ 이름 수정:", 
+            value=pure_name_no_ext, 
+            key=f"rename_input_{file_path}"
+        )
+        
+        # 다운로드 버튼 및 기능 버튼들을 한 줄에 배치하기 위한 가로 레이아웃(컬럼)
+        col1, col2, col3 = st.sidebar.columns([2, 1, 1])
+        
+        # 파일 바이너리 미리 읽기
         with open(file_path, "rb") as f:
-            st.sidebar.download_button(
-                label=f"💾 {display_name}",
-                data=f.read(),
-                file_name=display_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=file_path
-            )
+            file_bytes = f.read()
+            
+        # (버튼 1) 다운로드 버튼
+        col1.download_button(
+            label="💾 다운로드",
+            data=file_bytes,
+            file_name=pure_name,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"dl_btn_{file_path}"
+        )
+        
+        # (버튼 2) 이름 변경 저장 버튼
+        # 사용자가 입력창에 적은 내용이 기존 파일명과 다를 때만 작동하도록 유도
+        if new_name_input != pure_name_no_ext:
+            if col2.button("💾 저장", key=f"save_btn_{file_path}"):
+                new_full_name = f"{timestamp_prefix}_{new_name_input}.xlsx" if timestamp_prefix else f"{new_name_input}.xlsx"
+                new_file_path = os.path.join(TEMP_DIR, new_full_name)
+                try:
+                    os.rename(file_path, new_file_path)
+                    st.toast("✅ 파일 이름이 변경되었습니다!")
+                    st.rerun()
+                except Exception as e:
+                    st.sidebar.error(f"오류: {e}")
+        else:
+            col2.caption("변경없음")
+            
+        # (버튼 3) 파일 삭제 버튼
+        if col3.button("🗑️ 삭제", key=f"del_btn_{file_path}"):
+            try:
+                os.remove(file_path)
+                st.toast("🗑️ 파일이 삭제되었습니다.")
+                st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"오류: {e}")
+                
+        st.sidebar.markdown("---")
 else:
     st.sidebar.info("아직 임시 저장된 파일이 없습니다.")
 
@@ -70,27 +121,21 @@ else:
 uploaded_file = st.file_uploader("변환할 PDF 파일을 선택하세요", type=["pdf"])
 
 if uploaded_file is not None:
-    # 실시간 작업 상황 텍스트를 갈아끼우기 위한 임시 플레이스홀더 생성 (★추가)
     status_text = st.empty()
     progress_bar = st.progress(0)
     
     status_text.info("⏳ PDF 파일을 읽어오는 중입니다...")
-    
     output_buffer = io.BytesIO()
     
     try:
-        total_tables_found = 0 # 총 찾아낸 표 개수 카운트용
+        total_tables_found = 0
         
-        # 엑셀 파일 생성을 위한 Writer 선언
         with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
             with pdfplumber.open(uploaded_file) as pdf:
                 total_pages = len(pdf.pages)
                 
-                # 전 페이지를 돌며 표 구조 추출
                 for page_num in range(total_pages):
                     current_page_idx = page_num + 1
-                    
-                    # 💡 여기에 사용자가 요청한 실시간 문자열 알림을 계속 업데이트해 줍니다! (★추가)
                     status_text.warning(
                         f"⚙️ 작업 진행 중: **{current_page_idx}** / **{total_pages}** 페이지 분석 중... "
                         f"(현재까지 찾아낸 표: {total_tables_found}개)"
@@ -108,24 +153,22 @@ if uploaded_file is not None:
                         
                         sheet_name = f"Page{current_page_idx}_Table{i + 1}"
                         df.to_excel(writer, sheet_name=sheet_name, index=False, header=False)
-                        total_tables_found += 1 # 표 개수 추가
+                        total_tables_found += 1
                     
-                    # 진행바 업데이트
                     progress_bar.progress(current_page_idx / total_pages)
         
         excel_data = output_buffer.getvalue()
         
-        # 서버에 임시 백업 파일 쓰기
+        # 서버에 임시 백업 파일 쓰기 (중복 방지용 타임스탬프 결합)
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         server_save_path = os.path.join(TEMP_DIR, f"{timestamp}_{final_excel_name}")
         with open(server_save_path, "wb") as f:
             f.write(excel_data)
             
-        # 💡 작업이 끝나면 완료 메시지로 깔끔하게 덮어쓰기! (★추가)
         status_text.success(
             f"🎉 변환 완료! 총 **{total_pages}페이지**를 스캔하여 **{total_tables_found}개**의 표를 성공적으로 추출했습니다."
         )
-        st.info("💡 사이드바의 '최근 변환된 파일' 목록에도 안전하게 임시 보관되었습니다.")
+        st.info("💡 왼쪽 사이드바 목록에 안전하게 임시 보관되었습니다. 이름 수정 및 삭제가 가능합니다.")
         
         # 4. 다운로드 버튼 생성
         st.download_button(
@@ -135,8 +178,8 @@ if uploaded_file is not None:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         
-        if st.button("🔄 최근 파일 목록 새로고침 하기"):
-            st.rerun()
+        # 변환 성공 후 사이드바 메뉴 갱신을 위한 리런
+        st.rerun()
         
     except Exception as e:
         status_text.error(f"❌ 변환 도중 오류가 발생했습니다: {e}")
