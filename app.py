@@ -645,7 +645,7 @@ def download_latest_yuanta_report(status_box=None, progress_bar=None, step_callb
             step_callback(step)
 
     try:
-        update_status("⏳ STEP 1/5 · 유안타증권 산업분석 게시판에 접속 중입니다...", 10, step=1)
+        update_status("⏳ STEP 1/5 · 사이트 접속 중입니다...", 10, step=1)
 
         driver = create_yuanta_driver(pdf_dir)
         driver.get(YUANTA_BASE_URL)
@@ -655,20 +655,20 @@ def download_latest_yuanta_report(status_box=None, progress_bar=None, step_callb
         )
         time.sleep(2)
 
-        update_status("🔎 STEP 1/5 · 작성자를 '황규원'으로 검색하고 있습니다...", 20, step=1)
+        update_status("🔎 STEP 1/5 · 자료 검색 중입니다...", 20, step=1)
         search_yuanta_author(driver, YUANTA_AUTHOR)
 
-        update_status("📋 STEP 2/5 · 최신 정유/화학 업체별 이슈 리포트를 찾고 있습니다...", 40, step=2)
+        update_status("📋 STEP 2/5 · 관련 이슈 리포트를 찾고 있습니다...", 40, step=2)
         target_link, report_title = find_latest_yuanta_report(driver)
 
         open_yuanta_report(driver, target_link)
 
-        update_status("📕 STEP 3/5 · 상세 화면에서 PDF를 다운로드하고 있습니다...", 60, step=3)
+        update_status("📕 STEP 3/5 · 자료를 다운로드하고 있습니다...", 60, step=3)
         click_yuanta_pdf_download(driver)
 
         pdf_file = wait_for_pdf_download(pdf_dir, timeout=90)
 
-        update_status("🔗 STEP 4/5 · PDF 내부의 엑셀 파일 링크를 분석하고 있습니다...", 80, step=4)
+        update_status("🔗 STEP 4/5 · 자료 중 필요한 데이터를 수집하고 있습니다...", 80, step=4)
         excel_urls = extract_excel_urls_from_pdf(pdf_file)
 
         if not excel_urls:
