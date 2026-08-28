@@ -261,8 +261,8 @@ def safe_filename(filename):
 # ==========================================
 def create_yuanta_driver(download_dir):
     """
-    Windows/로컬 및 Streamlit 배포 환경을 모두 고려한
-    Headless Chrome/Chromium 드라이버 생성 함수.
+    Streamlit Cloud / Windows 모두 지원하는
+    Headless Chrome 드라이버 생성
     """
     options = webdriver.ChromeOptions()
 
@@ -275,6 +275,7 @@ def create_yuanta_driver(download_dir):
     }
     options.add_experimental_option("prefs", prefs)
 
+    # 백그라운드 실행
     options.add_argument("--headless=new")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--disable-gpu")
@@ -282,36 +283,35 @@ def create_yuanta_driver(download_dir):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-notifications")
     options.add_argument("--disable-popup-blocking")
-    options.add_argument("--remote-allow-origins=*")
+    options.add_argument("--disable-software-rasterizer")
 
-    # 일반적인 Linux/Streamlit 배포 환경의 Chromium 경로 자동 탐색
-    chrome_candidates = [
-        os.environ.get("CHROME_BIN"),
-        "/usr/bin/chromium",
-        "/usr/bin/chromium-browser",
-        "/usr/bin/google-chrome",
-        "/usr/bin/google-chrome-stable",
-    ]
+    # ==============================
+    # Streamlit Cloud Linux
+    # ==============================
+    if os.path.exists("/usr/bin/chromium"):
+        options.binary_location = "/usr/bin/chromium"
 
-    for chrome_path in chrome_candidates:
-        if chrome_path and os.path.exists(chrome_path):
-            options.binary_location = chrome_path
-            break
-
-    driver_candidates = [
-        os.environ.get("CHROMEDRIVER_PATH"),
-        "/usr/bin/chromedriver",
-        "/usr/local/bin/chromedriver",
-    ]
-
-    for driver_path in driver_candidates:
-        if driver_path and os.path.exists(driver_path):
+        if os.path.exists("/usr/bin/chromedriver"):
+            service = Service("/usr/bin/chromedriver")
             return webdriver.Chrome(
-                service=Service(driver_path),
-                options=options,
+                service=service,
+                options=options
             )
 
-    # 로컬 PC의 Selenium Manager 또는 시스템 PATH에 있는 드라이버 사용
+    # 일부 Linux 환경
+    if os.path.exists("/usr/bin/chromium-browser"):
+        options.binary_location = "/usr/bin/chromium-browser"
+
+        if os.path.exists("/usr/bin/chromedriver"):
+            service = Service("/usr/bin/chromedriver")
+            return webdriver.Chrome(
+                service=service,
+                options=options
+            )
+
+    # ==============================
+    # Windows / 로컬 환경
+    # ==============================
     return webdriver.Chrome(options=options)
 
 
