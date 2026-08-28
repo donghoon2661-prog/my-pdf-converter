@@ -624,7 +624,7 @@ def download_excel_bytes(excel_url):
     return response.content
 
 
-def download_latest_yuanta_report(status_box=None, progress_bar=None):
+def download_latest_yuanta_report(status_box=None, progress_bar=None, step_callback=None):
     """
     Streamlit용 유안타 자동 수집 메인 함수.
 
@@ -636,14 +636,16 @@ def download_latest_yuanta_report(status_box=None, progress_bar=None):
     pdf_dir = temp_root / "pdf"
     pdf_dir.mkdir(parents=True, exist_ok=True)
 
-    def update_status(message, progress=None):
+    def update_status(message, progress=None, step=None):
         if status_box is not None:
             status_box.info(message)
         if progress_bar is not None and progress is not None:
             progress_bar.progress(progress)
+        if step_callback is not None and step is not None:
+            step_callback(step)
 
     try:
-        update_status("⏳ STEP 1/5 · 유안타증권 산업분석 게시판에 접속 중입니다...", 10)
+        update_status("⏳ STEP 1/5 · 유안타증권 산업분석 게시판에 접속 중입니다...", 10, step=1)
 
         driver = create_yuanta_driver(pdf_dir)
         driver.get(YUANTA_BASE_URL)
@@ -653,20 +655,20 @@ def download_latest_yuanta_report(status_box=None, progress_bar=None):
         )
         time.sleep(2)
 
-        update_status("🔎 STEP 1/5 · 작성자를 '황규원'으로 검색하고 있습니다...", 20)
+        update_status("🔎 STEP 1/5 · 작성자를 '황규원'으로 검색하고 있습니다...", 20, step=1)
         search_yuanta_author(driver, YUANTA_AUTHOR)
 
-        update_status("📋 STEP 2/5 · 최신 정유/화학 업체별 이슈 리포트를 찾고 있습니다...", 40)
+        update_status("📋 STEP 2/5 · 최신 정유/화학 업체별 이슈 리포트를 찾고 있습니다...", 40, step=2)
         target_link, report_title = find_latest_yuanta_report(driver)
 
         open_yuanta_report(driver, target_link)
 
-        update_status("📕 STEP 3/5 · 상세 화면에서 PDF를 다운로드하고 있습니다...", 60)
+        update_status("📕 STEP 3/5 · 상세 화면에서 PDF를 다운로드하고 있습니다...", 60, step=3)
         click_yuanta_pdf_download(driver)
 
         pdf_file = wait_for_pdf_download(pdf_dir, timeout=90)
 
-        update_status("🔗 STEP 4/5 · PDF 내부의 엑셀 파일 링크를 분석하고 있습니다...", 80)
+        update_status("🔗 STEP 4/5 · PDF 내부의 엑셀 파일 링크를 분석하고 있습니다...", 80, step=4)
         excel_urls = extract_excel_urls_from_pdf(pdf_file)
 
         if not excel_urls:
@@ -674,7 +676,7 @@ def download_latest_yuanta_report(status_box=None, progress_bar=None):
                 "PDF 안에서 .xlsx 또는 .xls 링크를 찾지 못했습니다."
             )
 
-        update_status("📗 STEP 5/5 · 원본 엑셀 파일을 다운로드하고 있습니다...", 92)
+        update_status("📗 STEP 5/5 · 원본 엑셀 파일을 다운로드하고 있습니다...", 92, step=5)
         excel_bytes = download_excel_bytes(excel_urls[0])
 
         # 사용자 요청 양식: 260724_원재료 시황자료.xlsx
@@ -682,7 +684,7 @@ def download_latest_yuanta_report(status_box=None, progress_bar=None):
             f"{datetime.now().strftime('%y%m%d')}_원재료 시황자료.xlsx"
         )
 
-        update_status("🎉 모든 작업이 완료되었습니다.", 100)
+        update_status("🎉 모든 작업이 완료되었습니다.", 100, step=6)
 
         return excel_bytes, excel_filename, report_title
 
@@ -1183,33 +1185,58 @@ with tab_yuanta:
 
     step_placeholder = st.empty()
 
-    step_placeholder.markdown("""
-    <div class="yuanta-step">
-        <span class="yuanta-dot"></span>
-        <b>STEP 1</b>&nbsp;&nbsp;유안타증권 접속 및 작성자 검색
-        <span style="margin-left:auto;color:#64748B;">대기 중</span>
-    </div>
-    <div class="yuanta-step">
-        <span class="yuanta-dot"></span>
-        <b>STEP 2</b>&nbsp;&nbsp;최신 정유/화학 리포트 선택
-        <span style="margin-left:auto;color:#64748B;">대기 중</span>
-    </div>
-    <div class="yuanta-step">
-        <span class="yuanta-dot"></span>
-        <b>STEP 3</b>&nbsp;&nbsp;PDF 다운로드
-        <span style="margin-left:auto;color:#64748B;">대기 중</span>
-    </div>
-    <div class="yuanta-step">
-        <span class="yuanta-dot"></span>
-        <b>STEP 4</b>&nbsp;&nbsp;PDF 내부 엑셀 링크 추출
-        <span style="margin-left:auto;color:#64748B;">대기 중</span>
-    </div>
-    <div class="yuanta-step">
-        <span class="yuanta-dot"></span>
-        <b>STEP 5</b>&nbsp;&nbsp;원본 엑셀 파일 다운로드
-        <span style="margin-left:auto;color:#64748B;">대기 중</span>
-    </div>
-    """, unsafe_allow_html=True)
+    STEP_LABELS = [
+        "유안타증권 접속 및 작성자 검색",
+        "최신 정유/화학 리포트 선택",
+        "PDF 다운로드",
+        "PDF 내부 엑셀 링크 추출",
+        "원본 엑셀 파일 다운로드",
+    ]
+
+    def render_yuanta_steps(current_step=0, failed_step=None):
+        rows = []
+
+        for idx, label in enumerate(STEP_LABELS, start=1):
+            if failed_step == idx:
+                dot_color = "#EF4444"
+                state = "❌ 오류"
+                state_color = "#DC2626"
+            elif current_step >= 6:
+                dot_color = "#22C55E"
+                state = "✅ 완료"
+                state_color = "#16A34A"
+            elif idx < current_step:
+                dot_color = "#22C55E"
+                state = "✅ 완료"
+                state_color = "#16A34A"
+            elif idx == current_step:
+                dot_color = "#3D5AFE"
+                state = "🔄 작업 중"
+                state_color = "#3D5AFE"
+            else:
+                dot_color = "#CBD5E1"
+                state = "대기 중"
+                state_color = "#64748B"
+
+            rows.append(
+                f"""
+                <div class="yuanta-step">
+                    <span class="yuanta-dot" style="background:{dot_color};"></span>
+                    <b>STEP {idx}</b>&nbsp;&nbsp;{label}
+                    <span style="margin-left:auto;color:{state_color};font-weight:600;">
+                        {state}
+                    </span>
+                </div>
+                """
+            )
+
+        step_placeholder.markdown(
+            "".join(rows),
+            unsafe_allow_html=True
+        )
+
+    # 초기 상태
+    render_yuanta_steps(0)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1222,6 +1249,7 @@ with tab_yuanta:
                 download_latest_yuanta_report(
                     status_box=status_box,
                     progress_bar=progress_bar,
+                    step_callback=render_yuanta_steps,
                 )
             )
 
@@ -1234,6 +1262,15 @@ with tab_yuanta:
 
         except Exception as e:
             progress_bar.empty()
+
+            # 현재 진행 단계 추정: 메시지에 STEP n/5가 있으면 해당 단계 표시
+            match = re.search(r"STEP\s*(\d)\s*/\s*5", str(e))
+            failed_step = int(match.group(1)) if match else None
+            render_yuanta_steps(
+                current_step=failed_step or 0,
+                failed_step=failed_step
+            )
+
             status_box.error(
                 f"❌ 자동 수집 중 오류가 발생했습니다.\n\n"
                 f"상세 내용: {e}"
