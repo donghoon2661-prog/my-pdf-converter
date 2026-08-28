@@ -822,7 +822,7 @@ with st.sidebar:
 tab_convert, tab_share, tab_yuanta = st.tabs([
     "🔄 PDF → 엑셀 변환",
     "🔗 파일 공유함",
-    "📊 유안타 시황자료",
+    "📊 원재료 시황자료",
 ])
 
 
@@ -1153,10 +1153,10 @@ with tab_share:
 with tab_yuanta:
     st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    st.markdown("### 📊 유안타증권 원재료 시황자료 자동 수집")
+    st.markdown("### 📊 원재료 시황자료 자동 수집")
 
     st.caption(
-        "황규원 연구원의 최신 정유/화학 업체별 이슈 리포트를 자동으로 찾아 "
+        "원재료 최신 정유/화학 업체별 이슈 리포트를 자동으로 찾아 "
         "PDF를 분석한 뒤 원본 엑셀 파일을 가져옵니다."
     )
 
@@ -1300,7 +1300,7 @@ with tab_yuanta:
 
     st.markdown("""
     <div class="yuanta-note">
-        🛡️ 이 기능은 유안타증권 게시판에서 공개적으로 접근 가능한 리포트를
+        🛡️ 이 기능은 게시판에서 공개적으로 접근 가능한 리포트를
         자동으로 검색하고, 해당 리포트 안에 포함된 원본 엑셀 링크를 내려받는 용도입니다.
     </div>
     """, unsafe_allow_html=True)
