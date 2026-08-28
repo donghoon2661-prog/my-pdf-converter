@@ -166,6 +166,20 @@ st.markdown("""
 
 
 # ==========================================
+# ★ 진구 사이트 이동 버튼
+# ==========================================
+col1, col2, col3 = st.columns([1.5, 1.5, 5])
+
+with col1:
+    if st.button(
+        "🛠️ 진구 사이트",
+        type="primary",
+        use_container_width=True,
+    ):
+        st.switch_page("pages/jingu.py")
+
+
+# ==========================================
 # 4. 공통 상수 / 유틸
 # ==========================================
 TEMP_DIR = "temporary_excel_storage"
