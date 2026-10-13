@@ -179,10 +179,13 @@ with col1:
         st.switch_page("pages/jingu.py")
 
 with col2:
-    st.link_button(
-        "🏨 AgodaScanner",
-        "https://agodascanner.com/",
-        use_container_width=True,
+    st.markdown(
+        '<a href="https://agodascanner.com/" target="_blank" '
+        'rel="noopener noreferrer" '
+        'style="display:block;text-align:center;padding:0.55rem 1.2rem;'
+        'border-radius:10px;background-color:#3D5AFE;color:white;'
+        'font-weight:600;text-decoration:none;">🏨 AgodaScanner ↗</a>',
+        unsafe_allow_html=True,
     )
 
 
