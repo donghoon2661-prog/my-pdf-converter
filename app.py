@@ -178,6 +178,13 @@ with col1:
     ):
         st.switch_page("pages/jingu.py")
 
+with col2:
+    st.link_button(
+        "🏨 AgodaScanner",
+        "https://agodascanner.com/",
+        use_container_width=True,
+    )
+
 
 # ==========================================
 # 4. 공통 상수 / 유틸
